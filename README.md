@@ -23,7 +23,7 @@ Full documentation: [ai-hub/README.md](ai-hub/README.md).
 ## Quick start
 
 ```
-git clone https://github.com/yeunglee95-gif/ai-hub
+git clone https://github.com/yeunglee95-gif/Clean-IP-Checker-AI-Hub
 cd ai-hub\ai-hub
 ```
 
