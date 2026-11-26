@@ -283,14 +283,25 @@ function Test-HubGate {
   if (-not $exit.Ip) {
     & $add 'IP reputation' $false 'no exit to look up' $false
   } else {
+    # ip-api answers instantly usually, but drops a request now and then through a
+    # tunnel ("empty reply"). One attempt makes a flaky lookup look like a bad exit,
+    # so try three times before saying it could not be measured.
     $rep = $null
-    try {
-      $u = 'http://ip-api.com/json/' + $exit.Ip + '?fields=status,countryCode,proxy,hosting,mobile,isp'
-      $raw = (& curl.exe -s --max-time 10 --noproxy '*' $u 2>$null) -join ''
-      if ($raw) { $rep = $raw | ConvertFrom-Json }
-    } catch { }
-    if (-not $rep -or $rep.status -ne 'success') {
-      & $add 'IP reputation' $false 'lookup failed - could not verify' $false
+    $repTries = 0
+    while (-not $rep -and $repTries -lt 3) {
+      $repTries++
+      try {
+        $u = 'http://ip-api.com/json/' + $exit.Ip + '?fields=status,countryCode,proxy,hosting,mobile,isp'
+        $raw = (& curl.exe -s --max-time 8 --noproxy '*' $u 2>$null) -join ''
+        if ($raw) {
+          $cand = $raw | ConvertFrom-Json
+          if ($cand -and $cand.status -eq 'success') { $rep = $cand }
+        }
+      } catch { }
+      if (-not $rep -and $repTries -lt 3) { Start-Sleep -Milliseconds 600 }
+    }
+    if (-not $rep) {
+      & $add 'IP reputation' $false "lookup failed $repTries times - could not verify" $false
     } else {
       $flags = @()
       if ($rep.proxy)   { $flags += 'proxy/VPN' }
@@ -301,6 +312,7 @@ function Test-HubGate {
         if ($flags.Count -gt 0) { 'FLAGGED as ' + ($flags -join ', ') }
         elseif ($rep.countryCode -ne 'US') { "$($rep.countryCode) - not US" }
         else { 'not flagged - US exit' }
+      if ($repTries -gt 1) { $repDetail += " (on attempt $repTries)" }
       & $add 'IP reputation' $repOk $repDetail $true
     }
   }
@@ -314,11 +326,15 @@ function Test-HubGate {
     $seen = @{}
     foreach ($h in $hosts) {
       $ip = $null
-      try {
-        $t = (& curl.exe -s --max-time 10 --noproxy '*' ("https://$h/cdn-cgi/trace") 2>$null) -join "`n"
-        $m = [regex]::Match($t, '(?m)^ip=(.+)$')
-        if ($m.Success) { $ip = $m.Groups[1].Value.Trim() }
-      } catch { }
+      # same reasoning as the reputation lookup: one dropped request is not a verdict
+      for ($k = 0; $k -lt 3 -and -not $ip; $k++) {
+        try {
+          $trace = (& curl.exe -s --max-time 8 --noproxy '*' ("https://$h/cdn-cgi/trace") 2>$null) -join "`n"
+          $m = [regex]::Match($trace, '(?m)^ip=(.+)$')
+          if ($m.Success) { $ip = $m.Groups[1].Value.Trim() }
+        } catch { }
+        if (-not $ip -and $k -lt 2) { Start-Sleep -Milliseconds 500 }
+      }
       $seen[$h] = $ip
     }
     $missing = @($hosts | Where-Object { -not $seen[$_] })
