@@ -1,4 +1,4 @@
-﻿// AIHub.exe - the doorbell for the AI Hub.
+// AIHub.exe - the doorbell for the AI Hub.
 //
 // Why this exists: powershell.exe is a console program, so Windows creates a
 // console window for it before any script can ask for it to be hidden. Hiding
@@ -40,7 +40,7 @@ class Launcher
     {
         // Same identity as the shortcuts and the hub process, so Windows groups
         // the launcher, the window and the pin as one app.
-        try { SetCurrentProcessExplicitAppUserModelID("AIHub.Desktop"); } catch { }
+        try { SetCurrentProcessExplicitAppUserModelID("Geniotek.AIHub"); } catch { }
 
         string dir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
         string script = Path.Combine(dir, "Start-AIHub.ps1");
