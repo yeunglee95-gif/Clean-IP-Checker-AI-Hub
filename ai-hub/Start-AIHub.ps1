@@ -489,7 +489,18 @@ function New-Tile($item, $disabled) {
   $b.BorderThickness = 1
   $b.IsEnabled = -not $disabled
   $b.Tag = $item
-  $b.ToolTip = $item.note
+  if ($item.note) {
+    $tip = New-Object System.Windows.Controls.ToolTip
+    $tip.Content = $item.note
+    $tip.Background = $cPanel
+    $tip.Foreground = $cText
+    $tip.BorderBrush = $cLine
+    $tip.BorderThickness = 1
+    $tip.Padding = '8,4,8,4'
+    $tip.FontFamily = $fontText
+    $tip.FontSize = 12
+    $b.ToolTip = $tip
+  }
 
   $row = New-Object System.Windows.Controls.StackPanel
   $row.Orientation = 'Horizontal'
@@ -520,6 +531,34 @@ function New-Tile($item, $disabled) {
   [void]$text.Children.Add($note)
 
   [void]$row.Children.Add($text)
+
+  $close = New-Object System.Windows.Controls.Border
+  $close.Width = 26
+  $close.Height = 26
+  $close.CornerRadius = 8
+  $close.Background = [System.Windows.Media.Brushes]::Transparent
+  $close.BorderThickness = 1
+  $close.BorderBrush = [System.Windows.Media.Brushes]::Transparent
+  $close.Cursor = 'Hand'
+  $close.VerticalAlignment = 'Center'
+  $close.HorizontalAlignment = 'Right'
+  $close.Margin = '0,0,-4,0'
+  $close.Visibility = 'Collapsed'
+  $close.ToolTip = 'Remove from AI Hub'
+  $xCanvas = New-Object System.Windows.Controls.Canvas
+  $xCanvas.Width = 9
+  $xCanvas.Height = 9
+  $x1 = New-Object System.Windows.Shapes.Line
+  $x1.X1 = 0; $x1.Y1 = 0; $x1.X2 = 9; $x1.Y2 = 9
+  $x1.Stroke = $cDim; $x1.StrokeThickness = 1.4
+  $x2 = New-Object System.Windows.Shapes.Line
+  $x2.X1 = 9; $x2.Y1 = 0; $x2.X2 = 0; $x2.Y2 = 9
+  $x2.Stroke = $cDim; $x2.StrokeThickness = 1.4
+  [void]$xCanvas.Children.Add($x1)
+  [void]$xCanvas.Children.Add($x2)
+  $close.Child = $xCanvas
+  [void]$row.Children.Add($close)
+
   $b.Child = $row
 
   if ($disabled) {
@@ -528,13 +567,16 @@ function New-Tile($item, $disabled) {
   }
   $b.Focusable = $true
   [void][System.Windows.Input.KeyboardNavigation]::SetIsTabStop($b, $true)
+  $script:RemoveButton = $close
   $b.Add_MouseEnter({
+    $close.Visibility = 'Visible'
     $br = $this.Background
     $anim = New-Object System.Windows.Media.Animation.ColorAnimation ([System.Windows.Media.Color]::FromRgb(0x20, 0x26, 0x2F)), ([TimeSpan]::FromMilliseconds(100))
     $br.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $anim)
     $this.BorderBrush = $cLineHi
   })
   $b.Add_MouseLeave({
+    $close.Visibility = 'Collapsed'
     $br = $this.Background
     $anim = New-Object System.Windows.Media.Animation.ColorAnimation ([System.Windows.Media.Color]::FromRgb(0x18, 0x1C, 0x22)), ([TimeSpan]::FromMilliseconds(120))
     $br.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $anim)
@@ -552,6 +594,15 @@ function New-Tile($item, $disabled) {
     param($s, $e)
     if ($e.Key -eq 'Enter' -or $e.Key -eq 'Space') { Invoke-HubItem $this.Tag; $e.Handled = $true }
   })
+  $close.Add_MouseEnter({ $this.Background = $cCard; $this.BorderBrush = $cLineHi })
+  $close.Add_MouseLeave({ $this.Background = [System.Windows.Media.Brushes]::Transparent; $this.BorderBrush = [System.Windows.Media.Brushes]::Transparent })
+  $close.Add_MouseLeftButtonUp({
+    param($s, $e)
+    $e.Handled = $true
+    Remove-HubItem $this.Tag
+  })
+  $close.Tag = $item
+
   $b.Add_MouseLeftButtonUp({ Invoke-HubItem $this.Tag })
   $b
 }
@@ -1529,6 +1580,22 @@ function Show-ExitsDialog {
   })
   $dlg.ShowDialog() | Out-Null
 }
+function Remove-HubItem($item) {
+  if (-not $item) { return }
+  try {
+    $cfg = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($i in @($cfg.items)) {
+      if ($i.target -eq $item.target -and $i.name -eq $item.name) { $i.enabled = $false }
+    }
+    ConvertTo-Json -InputObject $cfg -Depth 6 | Set-Content -LiteralPath $configPath -Encoding UTF8
+    Load-Items
+    Write-GateLog ("REMOVE  {0} :: {1}" -f $item.name, $item.target)
+    if ($script:LastGate) { Render $script:LastGate }
+  } catch {
+    Write-GateLog ('REMOVE-FAIL  ' + $_.Exception.Message)
+  }
+}
+
 function Add-HubItem {
   param($name, $note, $kind, $target, $group, [ref]$message)
   $name = ([string]$name).Trim()
@@ -1546,9 +1613,17 @@ function Add-HubItem {
   if ($kind -eq 'url' -and $target -notmatch '^[a-zA-Z]+://') { $target = 'https://' + $target }
   try {
     $cfg = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $list = [object[]]@($cfg.items)
-    $list += [pscustomobject]@{
-      name = $name; note = $note; kind = $kind; target = $target; group = $group; enabled = $true
+    $list = @([object[]]@($cfg.items))
+    $existing = @($list | Where-Object { $_.target -eq $target -and $_.kind -eq $kind }) | Select-Object -First 1
+    if ($existing) {
+      $existing.name = $name
+      $existing.note = $note
+      $existing.group = $group
+      $existing.enabled = $true
+    } else {
+      $list += [pscustomobject]@{
+        name = $name; note = $note; kind = $kind; target = $target; group = $group; enabled = $true
+      }
     }
     $out = [pscustomobject]@{ items = $list }
     ConvertTo-Json -InputObject $out -Depth 6 | Set-Content -LiteralPath $configPath -Encoding UTF8
