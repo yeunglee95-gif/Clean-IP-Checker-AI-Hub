@@ -1,0 +1,19 @@
+﻿The MIT licence in this repository covers the code only.
+
+The image files under ai-hub/assets/brand/ are trademarks or copyrighted artwork of
+their respective owners:
+
+  claude*.png            Anthropic PBC
+  chatgpt*.png           OpenAI
+  codex*.png             OpenAI
+  openai-platform-22.png OpenAI
+  orca-22.png            Orca (com.stablyai.orca)
+  claude.png             Anthropic PBC (extracted from the installed app)
+
+They are included only so the tiles can identify the app they launch, which is
+nominative use. They are not licensed for redistribution as artwork, and they are
+excluded from the MIT grant. Remove them and the hub still works: tiles without a
+mark render as text.
+
+The OpenAI mark files were derived from the vendors' own published favicons. If you
+are a rights holder and want a mark removed, open an issue.

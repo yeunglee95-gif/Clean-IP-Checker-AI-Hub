@@ -1,0 +1,68 @@
+﻿{
+  "items": [
+    {
+      "name": "Claude",
+      "note": "Desktop app",
+      "kind": "appid",
+      "target": "Claude_pzs8sxrjxfjjc!Claude",
+      "group": "Desktop apps",
+      "enabled": true
+    },
+    {
+      "name": "ChatGPT",
+      "note": "Desktop app",
+      "kind": "appid",
+      "target": "OpenAI.Codex_2p2nqsd0c76g0!App",
+      "group": "Desktop apps",
+      "enabled": true
+    },
+    {
+      "name": "Claude Code",
+      "note": "Terminal",
+      "kind": "cli",
+      "target": "claude",
+      "group": "Terminals",
+      "enabled": true
+    },
+    {
+      "name": "Codex",
+      "note": "Terminal, OpenAI",
+      "kind": "cli",
+      "target": "codex",
+      "group": "Terminals",
+      "enabled": true
+    },
+    {
+      "name": "claude.ai",
+      "note": "Web chat",
+      "kind": "url",
+      "target": "https://claude.ai",
+      "group": "Web consoles",
+      "enabled": true
+    },
+    {
+      "name": "Claude Console",
+      "note": "API keys, usage",
+      "kind": "url",
+      "target": "https://console.anthropic.com",
+      "group": "Web consoles",
+      "enabled": true
+    },
+    {
+      "name": "chatgpt.com",
+      "note": "Web chat",
+      "kind": "url",
+      "target": "https://chatgpt.com",
+      "group": "Web consoles",
+      "enabled": true
+    },
+    {
+      "name": "OpenAI Platform",
+      "note": "API, billing",
+      "kind": "url",
+      "target": "https://platform.openai.com",
+      "group": "Web consoles",
+      "enabled": true
+    }
+  ]
+}
