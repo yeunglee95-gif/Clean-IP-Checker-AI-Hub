@@ -472,9 +472,9 @@ function New-IconBox($item) {
 
 function New-Tile($item, $disabled) {
   $b = New-Object System.Windows.Controls.Border
-  $b.Width = 200
+  $b.Width = 194
   $b.Height = 72
-  $b.Margin = '0,0,16,0'
+  $b.Margin = '0,0,16,16'
   $b.CornerRadius = 12
   $b.Padding = '12,0,12,0'
   if ($disabled) {
@@ -510,7 +510,7 @@ function New-Tile($item, $disabled) {
   $text = New-Object System.Windows.Controls.StackPanel
   $text.VerticalAlignment = 'Center'
   $text.Margin = '10,0,0,0'
-  $text.Width = 128
+  $text.Width = 118
 
   $n = New-Object System.Windows.Controls.TextBlock
   $n.Text = $item.name
@@ -725,7 +725,7 @@ function New-Blocked($gate) {
 # ---------------------------------------------------------------- window
 $win = New-Object System.Windows.Window
 $win.Width = 940
-$win.Height = 764
+$win.Height = 872
 $win.WindowStyle = 'None'
 $win.ResizeMode = 'CanMinimize'   # gives the shell a minimise box to act on
 $win.AllowsTransparency = $true
@@ -1210,14 +1210,14 @@ function Render($gate) {
     [void]$tileHost.Children.Add($label)
 
     $wrap = New-Object System.Windows.Controls.WrapPanel
-    $wrap.Width = 884
+    $wrap.Width = 856
     foreach ($it in ($script:Items | Where-Object { $_.group -eq $grp })) {
       [void]$wrap.Children.Add((New-Tile $it $blocked))
     }
     [void]$tileHost.Children.Add($wrap)
 
     $gap = New-Object System.Windows.Controls.Border
-    $gap.Height = 10
+    $gap.Height = 2
     [void]$tileHost.Children.Add($gap)
   }
 }
