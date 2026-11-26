@@ -443,7 +443,7 @@ function Resolve-IconFile($item) {
 
 function New-IconBox($item) {
   $slot = New-Object System.Windows.Controls.Grid
-  $slot.Width = 32
+  $slot.Width = 26
   $slot.Height = 32
   $slot.VerticalAlignment = 'Center'
 
@@ -476,7 +476,7 @@ function New-Tile($item, $disabled) {
   $b.Height = 72
   $b.Margin = '0,0,16,16'
   $b.CornerRadius = 12
-  $b.Padding = '12,0,12,0'
+  $b.Padding = '10,0,10,0'
   if ($disabled) {
     $b.Background = New-Brush '#14171B'
     $b.BorderBrush = $cEdgeDisabled
@@ -509,8 +509,8 @@ function New-Tile($item, $disabled) {
 
   $text = New-Object System.Windows.Controls.StackPanel
   $text.VerticalAlignment = 'Center'
-  $text.Margin = '10,0,0,0'
-  $text.Width = 118
+  $text.Margin = '8,0,0,0'
+  $text.Width = 122
 
   $n = New-Object System.Windows.Controls.TextBlock
   $n.Text = $item.name
@@ -533,18 +533,18 @@ function New-Tile($item, $disabled) {
   [void]$row.Children.Add($text)
 
   $close = New-Object System.Windows.Controls.Border
-  $close.Width = 26
-  $close.Height = 26
-  $close.CornerRadius = 8
+  $close.Width = 20
+  $close.Height = 20
+  $close.CornerRadius = 6
   $close.Background = [System.Windows.Media.Brushes]::Transparent
   $close.BorderThickness = 1
   $close.BorderBrush = [System.Windows.Media.Brushes]::Transparent
   $close.Cursor = 'Hand'
   $close.VerticalAlignment = 'Center'
   $close.HorizontalAlignment = 'Right'
-  $close.Margin = '0,0,-4,0'
-  $close.Visibility = 'Collapsed'
-  $close.ToolTip = 'Remove from AI Hub'
+  $close.Margin = '4,0,0,0'
+  $close.Opacity = 0.35
+  $close.ToolTip = 'Remove this tile from the hub'
   $xCanvas = New-Object System.Windows.Controls.Canvas
   $xCanvas.Width = 9
   $xCanvas.Height = 9
@@ -569,14 +569,14 @@ function New-Tile($item, $disabled) {
   [void][System.Windows.Input.KeyboardNavigation]::SetIsTabStop($b, $true)
   $script:RemoveButton = $close
   $b.Add_MouseEnter({
-    $close.Visibility = 'Visible'
+    $close.Opacity = 1
     $br = $this.Background
     $anim = New-Object System.Windows.Media.Animation.ColorAnimation ([System.Windows.Media.Color]::FromRgb(0x20, 0x26, 0x2F)), ([TimeSpan]::FromMilliseconds(100))
     $br.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $anim)
     $this.BorderBrush = $cLineHi
   })
   $b.Add_MouseLeave({
-    $close.Visibility = 'Collapsed'
+    $close.Opacity = 0.35
     $br = $this.Background
     $anim = New-Object System.Windows.Media.Animation.ColorAnimation ([System.Windows.Media.Color]::FromRgb(0x18, 0x1C, 0x22)), ([TimeSpan]::FromMilliseconds(120))
     $br.BeginAnimation([System.Windows.Media.SolidColorBrush]::ColorProperty, $anim)
@@ -594,8 +594,8 @@ function New-Tile($item, $disabled) {
     param($s, $e)
     if ($e.Key -eq 'Enter' -or $e.Key -eq 'Space') { Invoke-HubItem $this.Tag; $e.Handled = $true }
   })
-  $close.Add_MouseEnter({ $this.Background = $cCard; $this.BorderBrush = $cLineHi })
-  $close.Add_MouseLeave({ $this.Background = [System.Windows.Media.Brushes]::Transparent; $this.BorderBrush = [System.Windows.Media.Brushes]::Transparent })
+  $close.Add_MouseEnter({ $this.Background = $cRedWash; $this.BorderBrush = $cRedEdge; $this.Opacity = 1 })
+  $close.Add_MouseLeave({ $this.Background = [System.Windows.Media.Brushes]::Transparent; $this.BorderBrush = [System.Windows.Media.Brushes]::Transparent; $this.Opacity = 0.35 })
   $close.Add_MouseLeftButtonUp({
     param($s, $e)
     $e.Handled = $true
