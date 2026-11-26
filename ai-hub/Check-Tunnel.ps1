@@ -174,6 +174,10 @@ function Test-HubGate {
     Non-fatal failures are warnings only.
   #>
   $checks = New-Object System.Collections.Generic.List[object]
+  # Hard budget for the whole run. When the link is bad, an unmeasured check is
+  # amber and the window answers in time; waiting 40 s to learn the same thing helps nobody.
+  $script:GateDeadline = (Get-Date).AddSeconds(20)
+  $script:BudgetLeft = { [int]((Get-Date) - $script:GateDeadline).TotalSeconds * -1 }
   $add = {
     param($n, $ok, $detail, $fatal)
     $checks.Add([pscustomobject]@{ Name = $n; Ok = [bool]$ok; Detail = $detail; Fatal = [bool]$fatal })
@@ -242,7 +246,8 @@ function Test-HubGate {
   & $add 'Exit stability' $churnOk $churnDetail $false
 
   # 7. WebRTC: what a UDP lookup learns, which is what a browser would leak
-  $stunIp = Get-StunAddress
+  $stunIp = $null
+  if ((& $script:BudgetLeft) -ge 4) { $stunIp = Get-StunAddress }
   if ($stunIp) {
     if (-not $exit.Ip) {
       & $add 'WebRTC / STUN' $false "$stunIp - no exit to compare against" $false
@@ -295,7 +300,9 @@ function Test-HubGate {
     # so try three times before saying it could not be measured.
     $rep = $null
     $repTries = 0
-    while (-not $rep -and $repTries -lt 2) {
+    $repBudget = ((& $script:BudgetLeft) -ge 6)
+    if (-not $repBudget) { $repTries = 99 }
+    while (-not $rep -and $repTries -lt 2 -and $repTries -lt 99) {
       $repTries++
       try {
         $u = 'http://ip-api.com/json/' + $exit.Ip + '?fields=status,countryCode,proxy,hosting,mobile,isp'
@@ -308,7 +315,8 @@ function Test-HubGate {
       if (-not $rep -and $repTries -lt 2) { Start-Sleep -Milliseconds 400 }
     }
     if (-not $rep) {
-      & $add 'IP reputation' $false "lookup failed $repTries times - could not verify" $false
+      $why = if ($repTries -eq 99) { 'skipped - the run was already slow' } else { "lookup failed $repTries times - could not verify" }
+      & $add 'IP reputation' $false $why $false
     } else {
       $flags = @()
       if ($rep.proxy)   { $flags += 'proxy/VPN' }
@@ -333,7 +341,7 @@ function Test-HubGate {
     $seen = @{}
     $unreachable = $false
     foreach ($h in $hosts) {
-      if ($unreachable) { $seen[$h] = $null; continue }
+      if ($unreachable -or ((& $script:BudgetLeft) -lt 4)) { $seen[$h] = $null; continue }
       $ip = $null
       # one dropped request is not a verdict, two in a row is close enough
       for ($k = 0; $k -lt 2 -and -not $ip; $k++) {
