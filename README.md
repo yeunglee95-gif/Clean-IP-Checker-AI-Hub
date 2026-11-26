@@ -1,15 +1,40 @@
-﻿# Clean IP Checker â€” and the AI Hub
+﻿# AI Hub
 
-Two things live here:
+A Windows front door for Claude, ChatGPT, Codex â€” and anything else you add. It
+verifies your tunnel before it opens anything, so a broken or leaking proxy shows up
+as a refusal instead of a quiet connection from your real address.
 
-- **AI Hub** (`ai-hub/`) â€” a Windows launcher that verifies your tunnel exit before it
-  opens Claude, ChatGPT, Codex or anything else you add. One window, no installer, no
-  background service. See [ai-hub/README.md](ai-hub/README.md).
-- **Clean IP Checker** â€” the web tool this repository is named for.
+One window. No installer, no background service, no admin rights. Delete the folder
+and it is gone.
 
-## AI Hub in one paragraph
+## What it does
 
-It runs 14 checks against your machine and your tunnel â€” adapter, default route, core,
-exit address, WebRTC, IPv6, DNS, reputation, and whether the AI vendors see the same
-exit â€” and refuses to open anything if a fatal one fails. Everything else is a tile:
-drop a program or a link on the window and it is added.
+- **14 checks** against the machine and the tunnel: adapter, default route, core,
+  exit IP, WebRTC, IPv6, DNS, IP reputation, whether the AI vendors see the same exit,
+  country, locale, timezone, exit stability, fingerprint.
+- **Refuses when a fatal check fails**, shows amber for advisory ones, and keeps a
+  logged "launch anyway" link so a wrong rule can never lock you out.
+- **Adds anything in one gesture**: drag a program, a shortcut, a `.url` file or a
+  link from your browser onto the window.
+- **Approved exits live in a file** and are edited from the app, not by editing code.
+
+Full documentation: [ai-hub/README.md](ai-hub/README.md).
+
+## Quick start
+
+```
+git clone https://github.com/yeunglee95-gif/ai-hub
+cd ai-hub\ai-hub
+```
+
+Put your server's IPv4 address in `exits.json`, then run `AIHub.exe`. That is it.
+
+## Requirements
+
+Windows 10/11 with Windows PowerShell 5.1 and a Clash Verge / Mihomo tunnel that
+creates an adapter named `Mihomo`.
+
+## Licence
+
+MIT for the code. Brand marks under `ai-hub/assets/brand/` are excluded â€” see
+[ai-hub/NOTICE](ai-hub/NOTICE).

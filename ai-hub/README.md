@@ -41,18 +41,37 @@ never lock you out of your own machine.
 
 ## Install
 
-1. Copy the `ai-hub` folder anywhere, e.g. `C:\Tools\ai-hub`.
-2. Open `exits.json` and replace the placeholder with your server's address:
+1. **Clone or copy this folder** anywhere, e.g. `C:\Tools\ai-hub`.
+2. **Put your server's address in `exits.json`** â€” this is the only required edit:
    ```json
    { "exits": [ { "ip": "198.51.100.7", "label": "My server" } ] }
    ```
-3. Right-click `AIHub.exe` â†’ Send to â†’ Desktop (create shortcut).
-4. Double-click it. The window paints immediately and the checks run in the
-   background; tiles appear when they finish.
+   That address is what the gate will accept. Anything else is a refusal.
+3. **Make a shortcut** to `AIHub.exe` on your desktop (right-click â†’ Send to â†’
+   Desktop). Do not pin `Start-AIHub.ps1` itself: the exe exists so that no console
+   window is ever created, and pinning the script brings that problem back.
+4. **Double-click it.** The window paints in about a second and the checks run in the
+   background for roughly eight.
 
-No admin, no install, no registry. The only files it writes are `gate-log.txt`
-(every launch and refusal) and `history.json` (exit addresses for the 48 h check).
+If the window says "Launch blocked", the strip names the check that failed. Press
+RE-CHECK after fixing it. If nothing at all happens, read `gate-log.txt` in the same
+folder: every start-up stage is stamped there with a process id.
 
+### If your tunnel adapter is not called Mihomo
+
+The first check looks for a network adapter named `Mihomo`. If yours is different,
+change the name in `Check-Tunnel.ps1`:
+
+```powershell
+$ad = Get-NetAdapter -Name 'Mihomo' -ErrorAction SilentlyContinue
+```
+
+### What it needs from the tunnel
+
+Full tunnel is assumed: every connection leaves through the tunnel. The checks look
+for an adapter that owns the default route, a core process, and an exit address that
+matches your approved list. Split-tunnel setups will fail the default-route check by
+design, because traffic that bypasses the tunnel is exactly what this tool is for.
 ## Adding your own apps
 
 Three ways, easiest first:
