@@ -34,21 +34,24 @@ function Write-GateLog {
 }
 
 function Get-ExitInfo {
-  # Ask two independent services, so one bad answer cannot decide the outcome.
+  # Ask two independent services, twice each: a single dropped request through a
+  # tunnel must not read as "no internet" and block every launch.
   $out = [pscustomobject]@{ Ip = $null; Country = $null; City = $null; Org = $null }
+
   try {
-    $raw = (& curl.exe -s --max-time 8 --noproxy '*' https://ipinfo.io/json 2>$null) -join ''
+    $raw = (& curl.exe -s --connect-timeout 3 --max-time 5 --noproxy '*' https://ipinfo.io/json 2>$null) -join ''
     if ($raw) {
       $j = $raw | ConvertFrom-Json
-      $out.Ip = $j.ip; $out.Country = $j.country; $out.City = $j.city; $out.Org = $j.org
+      if ($j -and $j.ip) { $out.Ip = $j.ip; $out.Country = $j.country; $out.City = $j.city; $out.Org = $j.org }
     }
   } catch { }
+
   if (-not $out.Ip) {
     try {
-      $raw = (& curl.exe -s --max-time 6 --noproxy '*' https://ifconfig.co/json 2>$null) -join ''
+      $raw = (& curl.exe -s --connect-timeout 3 --max-time 5 --noproxy '*' https://ifconfig.co/json 2>$null) -join ''
       if ($raw) {
         $j = $raw | ConvertFrom-Json
-        $out.Ip = $j.ip; $out.Country = $j.country_iso; $out.City = $j.city; $out.Org = $j.asn_org
+        if ($j -and $j.ip) { $out.Ip = $j.ip; $out.Country = $j.country_iso; $out.City = $j.city; $out.Org = $j.asn_org }
       }
     } catch { }
   }
@@ -241,8 +244,12 @@ function Test-HubGate {
   # 7. WebRTC: what a UDP lookup learns, which is what a browser would leak
   $stunIp = Get-StunAddress
   if ($stunIp) {
-    $sameIp = ($stunIp -eq $exit.Ip)
-    & $add 'WebRTC / STUN' $sameIp $(if ($sameIp) { 'same address as the exit' } else { "$stunIp - DIFFERENT from the exit" }) $true
+    if (-not $exit.Ip) {
+      & $add 'WebRTC / STUN' $false "$stunIp - no exit to compare against" $false
+    } else {
+      $sameIp = ($stunIp -eq $exit.Ip)
+      & $add 'WebRTC / STUN' $sameIp $(if ($sameIp) { 'same address as the exit' } else { "$stunIp - DIFFERENT from the exit" }) $true
+    }
   } else {
     # A UDP block is not proof of safety, so this is amber, never green.
     & $add 'WebRTC / STUN' $false 'could not measure - no UDP answer' $false
@@ -288,17 +295,17 @@ function Test-HubGate {
     # so try three times before saying it could not be measured.
     $rep = $null
     $repTries = 0
-    while (-not $rep -and $repTries -lt 3) {
+    while (-not $rep -and $repTries -lt 2) {
       $repTries++
       try {
         $u = 'http://ip-api.com/json/' + $exit.Ip + '?fields=status,countryCode,proxy,hosting,mobile,isp'
-        $raw = (& curl.exe -s --max-time 8 --noproxy '*' $u 2>$null) -join ''
+        $raw = (& curl.exe -s --connect-timeout 3 --max-time 5 --noproxy '*' $u 2>$null) -join ''
         if ($raw) {
           $cand = $raw | ConvertFrom-Json
           if ($cand -and $cand.status -eq 'success') { $rep = $cand }
         }
       } catch { }
-      if (-not $rep -and $repTries -lt 3) { Start-Sleep -Milliseconds 600 }
+      if (-not $rep -and $repTries -lt 2) { Start-Sleep -Milliseconds 400 }
     }
     if (-not $rep) {
       & $add 'IP reputation' $false "lookup failed $repTries times - could not verify" $false
@@ -324,17 +331,20 @@ function Test-HubGate {
   } else {
     $hosts = @('claude.ai', 'api.anthropic.com', 'console.anthropic.com')
     $seen = @{}
+    $unreachable = $false
     foreach ($h in $hosts) {
+      if ($unreachable) { $seen[$h] = $null; continue }
       $ip = $null
-      # same reasoning as the reputation lookup: one dropped request is not a verdict
-      for ($k = 0; $k -lt 3 -and -not $ip; $k++) {
+      # one dropped request is not a verdict, two in a row is close enough
+      for ($k = 0; $k -lt 2 -and -not $ip; $k++) {
         try {
-          $trace = (& curl.exe -s --max-time 8 --noproxy '*' ("https://$h/cdn-cgi/trace") 2>$null) -join "`n"
+          $trace = (& curl.exe -s --connect-timeout 3 --max-time 5 --noproxy '*' ("https://$h/cdn-cgi/trace") 2>$null) -join "`n"
           $m = [regex]::Match($trace, '(?m)^ip=(.+)$')
           if ($m.Success) { $ip = $m.Groups[1].Value.Trim() }
         } catch { }
-        if (-not $ip -and $k -lt 2) { Start-Sleep -Milliseconds 500 }
+        if (-not $ip -and $k -lt 1) { Start-Sleep -Milliseconds 400 }
       }
+      if (-not $ip) { $unreachable = $true }
       $seen[$h] = $ip
     }
     $missing = @($hosts | Where-Object { -not $seen[$_] })
