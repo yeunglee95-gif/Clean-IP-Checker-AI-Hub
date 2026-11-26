@@ -295,13 +295,159 @@ function Get-MarkFile($item) {
   $null
 }
 
+# ---------------------------------------------------------------- icon maker
+# Built-in brands use their own mark. Anything else gets an icon derived from the
+# thing it launches: the program's own icon, the site's favicon, or a lettered
+# plate. Cached in assets\cache so it is built once.
+$script:IconCache = Join-Path $here 'assets\cache'
+if (-not (Test-Path $script:IconCache)) { New-Item -ItemType Directory -Path $script:IconCache -Force | Out-Null }
+
+function Get-IconCachePath($item) {
+  $key = [string]$item.target
+  $md5 = [System.Security.Cryptography.MD5]::Create()
+  $bytes = [Text.Encoding]::UTF8.GetBytes($key.ToLower())
+  $hash = ([BitConverter]::ToString($md5.ComputeHash($bytes)) -replace '-', '').Substring(0, 12).ToLower()
+  Join-Path $script:IconCache ($hash + '.png')
+}
+
+function New-LetterIcon($name, $outPath) {
+  $bmp = New-Object System.Drawing.Bitmap 88, 88, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.SmoothingMode = 'AntiAlias'
+  $g.TextRenderingHint = 'AntiAliasGridFit'
+  $g.Clear([System.Drawing.Color]::Transparent)
+
+  # colour from the name, so the same app always gets the same plate
+  $sum = 0
+  foreach ($ch in ([string]$name).ToCharArray()) { $sum += [int]$ch }
+  $palette = @(
+    @(0x2F, 0x6F, 0x8F), @(0x3B, 0x7A, 0x5A), @(0x8A, 0x5A, 0x2F), @(0x5A, 0x4A, 0x8F),
+    @(0x8F, 0x3B, 0x5A), @(0x2F, 0x5A, 0x8F), @(0x5A, 0x6F, 0x2F), @(0x6F, 0x2F, 0x6F)
+  )
+  $c = $palette[$sum % $palette.Count]
+  $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+  $r = 20
+  $path.AddArc(0, 0, $r * 2, $r * 2, 180, 90)
+  $path.AddArc(88 - $r * 2, 0, $r * 2, $r * 2, 270, 90)
+  $path.AddArc(88 - $r * 2, 88 - $r * 2, $r * 2, $r * 2, 0, 90)
+  $path.AddArc(0, 88 - $r * 2, $r * 2, $r * 2, 90, 90)
+  $path.CloseFigure()
+  $g.FillPath((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, $c[0], $c[1], $c[2]))), $path)
+
+  $letter = ([string]$name).Trim()
+  if ($letter.Length -gt 0) { $letter = $letter.Substring(0, 1).ToUpper() } else { $letter = '?' }
+  $font = New-Object System.Drawing.Font 'Segoe UI', 44, ([System.Drawing.FontStyle]::Bold), ([System.Drawing.GraphicsUnit]::Pixel)
+  $fmt = New-Object System.Drawing.StringFormat
+  $fmt.Alignment = 'Center'
+  $fmt.LineAlignment = 'Center'
+  $g.DrawString($letter, $font, [System.Drawing.Brushes]::White, (New-Object System.Drawing.RectangleF 0, 2, 88, 88), $fmt)
+  $g.Dispose(); $path.Dispose(); $font.Dispose()
+  $bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+  $bmp.Dispose()
+  $outPath
+}
+
+function Get-ExeIconPng($exePath, $outPath) {
+  Add-Type -AssemblyName System.Drawing
+  if (-not ('Hub.Icon' -as [type])) {
+    $def = '[System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] public static extern int PrivateExtractIcons(string file, int index, int cx, int cy, System.IntPtr[] icons, int[] ids, int n, int flags);'
+    $def += ' [System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool DestroyIcon(System.IntPtr h);'
+    Add-Type -Namespace Hub -Name Icon -MemberDefinition $def
+  }
+  $icons = New-Object IntPtr[] 1
+  $ids = New-Object int[] 1
+  $n = [Hub.Icon]::PrivateExtractIcons($exePath, 0, 256, 256, $icons, $ids, 1, 0)
+  $bmp = $null
+  if ($n -gt 0 -and $icons[0] -ne [IntPtr]::Zero) {
+    try {
+      $ico = [System.Drawing.Icon]::FromHandle($icons[0])
+      $bmp = $ico.ToBitmap()
+      $ico.Dispose()
+      [void][Hub.Icon]::DestroyIcon($icons[0])
+    } catch { }
+  }
+  if (-not $bmp) {
+    try { $bmp = [System.Drawing.Icon]::ExtractAssociatedIcon($exePath).ToBitmap() } catch { }
+  }
+  if (-not $bmp) { return $false }
+  $out = New-Object System.Drawing.Bitmap 88, 88, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+  $g = [System.Drawing.Graphics]::FromImage($out)
+  $g.InterpolationMode = 'HighQualityBicubic'
+  $g.PixelOffsetMode = 'HighQuality'
+  $scale = [Math]::Min(88.0 / $bmp.Width, 88.0 / $bmp.Height)
+  $w = [int][Math]::Round($bmp.Width * $scale); $h = [int][Math]::Round($bmp.Height * $scale)
+  $g.DrawImage($bmp, [int]((88 - $w) / 2), [int]((88 - $h) / 2), $w, $h)
+  $g.Dispose(); $bmp.Dispose()
+  $out.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+  $out.Dispose()
+  $true
+}
+
+function Get-UrlIconPng($address, $outPath) {
+  $uri = $null
+  if (-not [Uri]::TryCreate($address, [UriKind]::Absolute, [ref]$uri)) { return $false }
+  foreach ($candidate in @(($uri.Scheme + '://' + $uri.Host + '/favicon.ico'), ($uri.Scheme + '://' + $uri.Host + '/favicon.png'), ($uri.Scheme + '://' + $uri.Host + '/apple-touch-icon.png'))) {
+    $tmp = [IO.Path]::GetTempFileName()
+    try {
+      & curl.exe -s -L --connect-timeout 3 --max-time 6 -o $tmp $candidate 2>$null
+      if ((Test-Path $tmp) -and ((Get-Item $tmp).Length -gt 200)) {
+        Add-Type -AssemblyName System.Drawing
+        try {
+          $img = [System.Drawing.Image]::FromFile($tmp)
+        } catch { $img = $null }
+        if ($img) {
+          $out = New-Object System.Drawing.Bitmap 88, 88, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+          $g = [System.Drawing.Graphics]::FromImage($out)
+          $g.InterpolationMode = 'HighQualityBicubic'
+          $scale = [Math]::Min(88.0 / $img.Width, 88.0 / $img.Height)
+          $w = [int][Math]::Round($img.Width * $scale); $h = [int][Math]::Round($img.Height * $scale)
+          $g.DrawImage($img, [int]((88 - $w) / 2), [int]((88 - $h) / 2), $w, $h)
+          $g.Dispose(); $img.Dispose()
+          $out.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+          $out.Dispose()
+          return $true
+        }
+      }
+    } catch { } finally { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
+  }
+  $false
+}
+
+function Resolve-IconFile($item) {
+  # built-in brands first
+  try {
+    $mark = Get-MarkFile $item
+    if ($mark) { return $mark }
+
+    $cache = Get-IconCachePath $item
+    if (Test-Path $cache) { return $cache }
+
+    $made = $false
+    switch ($item.kind) {
+      'exe' {
+        $target = [string]$item.target
+        if (Test-Path $target) { $made = Get-ExeIconPng $target $cache }
+      }
+      'url' {
+        $made = Get-UrlIconPng ([string]$item.target) $cache
+      }
+    }
+    if (-not $made) { [void](New-LetterIcon $item.name $cache) }
+    $cache
+  } catch {
+    Write-GateLog ('ICON    ' + $item.name + ' :: ' + $_.Exception.Message)
+    $null
+  }
+}
+
+
 function New-IconBox($item) {
   $slot = New-Object System.Windows.Controls.Grid
   $slot.Width = 32
   $slot.Height = 32
   $slot.VerticalAlignment = 'Center'
 
-  $file = Get-MarkFile $item
+  $file = Resolve-IconFile $item
   if ($file) {
     $bmp = New-Object System.Windows.Media.Imaging.BitmapImage
     $bmp.BeginInit()
