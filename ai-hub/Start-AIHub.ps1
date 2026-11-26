@@ -443,7 +443,7 @@ function Resolve-IconFile($item) {
 
 function New-IconBox($item) {
   $slot = New-Object System.Windows.Controls.Grid
-  $slot.Width = 26
+  $slot.Width = 22
   $slot.Height = 32
   $slot.VerticalAlignment = 'Center'
 
@@ -458,8 +458,8 @@ function New-IconBox($item) {
     $img = New-Object System.Windows.Controls.Image
     $img.Source = $bmp
     $img.Stretch = 'Uniform'
-    $img.Width = 22
-    $img.Height = 22
+    $img.Width = 20
+    $img.Height = 20
     $img.HorizontalAlignment = 'Center'
     $img.VerticalAlignment = 'Center'
     [void]$slot.Children.Add($img)
@@ -476,7 +476,7 @@ function New-Tile($item, $disabled) {
   $b.Height = 72
   $b.Margin = '0,0,16,16'
   $b.CornerRadius = 12
-  $b.Padding = '10,0,10,0'
+  $b.Padding = '8,0,8,0'
   if ($disabled) {
     $b.Background = New-Brush '#14171B'
     $b.BorderBrush = $cEdgeDisabled
@@ -510,7 +510,7 @@ function New-Tile($item, $disabled) {
   $text = New-Object System.Windows.Controls.StackPanel
   $text.VerticalAlignment = 'Center'
   $text.Margin = '8,0,0,0'
-  $text.Width = 122
+  $text.Width = 116
 
   $n = New-Object System.Windows.Controls.TextBlock
   $n.Text = $item.name
